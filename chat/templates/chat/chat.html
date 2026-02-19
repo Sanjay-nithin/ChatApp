@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .user-info {
+            font-size: 14px;
+            margin-top: 5px;
+            opacity: 0.9;
+        }
+
+        .chat-container {
+            flex: 1;
+            max-width: 900px;
+            width: 100%;
+            margin: 20px auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.sent {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .message.received {
+            background: #e9ecef;
+            color: #333;
+            align-self: flex-start;
+        }
+
+        .message-username {
+            font-weight: 600;
+            font-size: 12px;
+            margin-bottom: 4px;
+            opacity: 0.8;
+        }
+
+        .message-content {
+            font-size: 15px;
+            line-height: 1.4;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            display: flex;
+            gap: 10px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+
+        #message-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #send-button {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        #send-button:hover {
+            transform: translateY(-2px);
+        }
+
+        #send-button:active {
+            transform: translateY(0);
+        }
+
+        .connection-status {
+            padding: 10px;
+            text-align: center;
+            font-size: 13px;
+            background: #fff3cd;
+            color: #856404;
+            border-bottom: 1px solid #ffeaa7;
+        }
+
+        .connection-status.connected {
+            background: #d4edda;
+            color: #155724;
+            border-bottom: 1px solid #c3e6cb;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 10px 20px;
+            font-size: 13px;
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗨️ Simple Chat Room</h1>
+        <div class="user-info">Logged in as: <strong>{{ user.username }}</strong></div>
+    </div>
+
+    <div class="connection-status" id="status">Connecting...</div>
+
+    <div class="chat-container">
+        <div id="chat-messages">
+            {% for message in messages %}
+            <div class="message {% if message.user == user %}sent{% else %}received{% endif %}">
+                {% if message.user != user %}
+                <div class="message-username">{{ message.user.username }}</div>
+                {% endif %}
+                <div class="message-content">{{ message.content }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="input-container">
+            <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const username = "{{ user.username }}";
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const chatSocket = new WebSocket(
+            protocol + '//' + window.location.host + '/ws/chat/'
+        );
+
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        chatSocket.onopen = function(e) {
+            statusDiv.textContent = 'Connected';
+            statusDiv.classList.add('connected');
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 2000);
+        };
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${data.username === username ? 'sent' : 'received'}`;
+            
+            if (data.username !== username) {
+                const usernameDiv = document.createElement('div');
+                usernameDiv.className = 'message-username';
+                usernameDiv.textContent = data.username;
+                messageDiv.appendChild(usernameDiv);
+            }
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = data.message;
+            messageDiv.appendChild(contentDiv);
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        };
+
+        chatSocket.onclose = function(e) {
+            statusDiv.textContent = 'Disconnected. Please refresh the page.';
+            statusDiv.classList.remove('connected');
+            statusDiv.style.display = 'block';
+        };
+
+        chatSocket.onerror = function(e) {
+            statusDiv.textContent = 'Connection error!';
+            statusDiv.style.display = 'block';
+        };
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                chatSocket.send(JSON.stringify({
+                    'message': message,
+                    'username': username
+                }));
+                messageInput.value = '';
+            }
+        }
+
+        sendButton.onclick = sendMessage;
+
+        messageInput.onkeypress = function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        };
+
+        // Auto-scroll to bottom on page load
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        // Focus on input
+        messageInput.focus();
+    </script>
+</body>
+</html>
