@@ -13,21 +13,25 @@ A simple real-time chat application built with Django and WebSockets for two peo
 ## Local Development
 
 1. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 2. Run migrations:
+
 ```bash
 python manage.py migrate
 ```
 
 3. Create a superuser (optional):
+
 ```bash
 python manage.py createsuperuser
 ```
 
 4. Run the development server:
+
 ```bash
 python manage.py runserver
 ```
@@ -37,6 +41,7 @@ python manage.py runserver
 ## Docker Deployment
 
 Build and run with Docker:
+
 ```bash
 docker build -t chatapp .
 docker run -p 8000:8000 chatapp
