@@ -27,32 +27,58 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # Receive message from WebSocket
     async def receive(self, text_data):
         data = json.loads(text_data)
-        message = data['message']
+        message_type = data.get('type', 'text')
         username = data['username']
 
-        # Save message to database
-        await self.save_message(username, message)
+        if message_type == 'text':
+            message = data['message']
+            # Save message to database
+            await self.save_message(username, message)
 
-        # Send message to room group
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': message,
-                'username': username
-            }
-        )
+            # Send message to room group
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'message': message,
+                    'username': username,
+                    'message_type': 'text'
+                }
+            )
+        elif message_type == 'voice':
+            voice_url = data['voice_url']
+            # Send voice message to room group
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'voice_url': voice_url,
+                    'username': username,
+                    'message_type': 'voice'
+                }
+            )
 
     # Receive message from room group
     async def chat_message(self, event):
-        message = event['message']
+        message_type = event.get('message_type', 'text')
         username = event['username']
 
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({
-            'message': message,
-            'username': username
-        }))
+        if message_type == 'text':
+            message = event['message']
+            # Send message to WebSocket
+            await self.send(text_data=json.dumps({
+                'message': message,
+                'username': username,
+                'message_type': 'text'
+            }))
+        elif message_type == 'voice':
+            voice_url = event['voice_url']
+            # Send voice message to WebSocket
+            await self.send(text_data=json.dumps({
+                'voice_url': voice_url,
+                'username': username,
+                'message_type': 'voice'
+            }))
 
     @database_sync_to_async
     def save_message(self, username, message):

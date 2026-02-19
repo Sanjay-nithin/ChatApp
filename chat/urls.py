@@ -4,4 +4,5 @@ from . import views
 urlpatterns = [
     path('', views.login_view, name='login'),
     path('chat/', views.chat_view, name='chat'),
+    path('upload-voice/', views.upload_voice, name='upload_voice'),
 ]

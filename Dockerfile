@@ -21,6 +21,9 @@ RUN pip install -r requirements.txt
 # Copy project files
 COPY . /app/
 
+# Create media directory
+RUN mkdir -p /app/media/voice_notes
+
 # Collect static files
 RUN python manage.py collectstatic --noinput
 

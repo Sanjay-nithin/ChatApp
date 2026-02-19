@@ -103,12 +103,29 @@
             line-height: 1.4;
         }
 
+        .voice-player {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .voice-player audio {
+            max-width: 200px;
+            height: 30px;
+        }
+
+        .voice-icon {
+            font-size: 20px;
+        }
+
         .input-container {
             padding: 20px;
             background: #f8f9fa;
             border-top: 1px solid #dee2e6;
             display: flex;
             gap: 10px;
+            align-items: center;
         }
 
         #message-input {
@@ -125,8 +142,8 @@
             border-color: #667eea;
         }
 
-        #send-button {
-            padding: 12px 30px;
+        .btn {
+            padding: 12px 24px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
@@ -135,14 +152,32 @@
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        #send-button:hover {
+        .btn:hover {
             transform: translateY(-2px);
         }
 
-        #send-button:active {
+        .btn:active {
             transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn.recording {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .connection-status {
@@ -160,12 +195,117 @@
             border-bottom: 1px solid #c3e6cb;
         }
 
-        .typing-indicator {
-            display: none;
-            padding: 10px 20px;
+        .recording-timer {
             font-size: 13px;
-            color: #6c757d;
-            font-style: italic;
+            color: #666;
+            padding: 5px 10px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .user-info {
+                font-size: 12px;
+            }
+
+            .chat-container {
+                margin: 10px;
+                border-radius: 0;
+                max-width: 100%;
+            }
+
+            #chat-messages {
+                padding: 15px 10px;
+                gap: 8px;
+            }
+
+            .message {
+                max-width: 85%;
+                padding: 10px 14px;
+                font-size: 14px;
+            }
+
+            .message-username {
+                font-size: 11px;
+            }
+
+            .message-content {
+                font-size: 14px;
+            }
+
+            .voice-player {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .voice-player audio {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .input-container {
+                padding: 12px 10px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            #message-input {
+                font-size: 14px;
+                padding: 10px 14px;
+                width: 100%;
+            }
+
+            .btn {
+                padding: 10px 20px;
+                font-size: 14px;
+                gap: 6px;
+                flex: 1;
+            }
+
+            .btn span {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 15px 10px;
+            }
+
+            .header h1 {
+                font-size: 18px;
+            }
+
+            .chat-container {
+                margin: 5px;
+                border-radius: 0;
+            }
+
+            #chat-messages {
+                padding: 10px;
+            }
+
+            .message {
+                max-width: 90%;
+                padding: 8px 12px;
+            }
+
+            .input-container {
+                padding: 10px 8px;
+            }
+
+            .btn {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+
+            #voice-icon {
+                font-size: 16px;
+            }
         }
     </style>
 </head>
@@ -184,14 +324,25 @@
                 {% if message.user != user %}
                 <div class="message-username">{{ message.user.username }}</div>
                 {% endif %}
+                {% if message.message_type == 'text' %}
                 <div class="message-content">{{ message.content }}</div>
+                {% else %}
+                <div class="voice-player">
+                    <span class="voice-icon">🎤</span>
+                    <audio controls src="{{ message.voice_note.url }}"></audio>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
 
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
-            <button id="send-button">Send</button>
+            <button id="voice-button" class="btn">
+                <span id="voice-icon">🎤</span>
+                <span id="voice-text">Voice</span>
+            </button>
+            <button id="send-button" class="btn">Send</button>
         </div>
     </div>
 
@@ -206,6 +357,14 @@
         const messagesDiv = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
+        const voiceButton = document.getElementById('voice-button');
+        const voiceIcon = document.getElementById('voice-icon');
+        const voiceText = document.getElementById('voice-text');
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordingStartTime;
 
         chatSocket.onopen = function(e) {
             statusDiv.textContent = 'Connected';
@@ -227,10 +386,20 @@
                 messageDiv.appendChild(usernameDiv);
             }
             
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.textContent = data.message;
-            messageDiv.appendChild(contentDiv);
+            if (data.message_type === 'voice') {
+                const voicePlayerDiv = document.createElement('div');
+                voicePlayerDiv.className = 'voice-player';
+                voicePlayerDiv.innerHTML = `
+                    <span class="voice-icon">🎤</span>
+                    <audio controls src="${data.voice_url}"></audio>
+                `;
+                messageDiv.appendChild(voicePlayerDiv);
+            } else {
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = data.message;
+                messageDiv.appendChild(contentDiv);
+            }
             
             messagesDiv.appendChild(messageDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -251,6 +420,7 @@
             const message = messageInput.value.trim();
             if (message) {
                 chatSocket.send(JSON.stringify({
+                    'type': 'text',
                     'message': message,
                     'username': username
                 }));
@@ -258,7 +428,71 @@
             }
         }
 
+        async function toggleVoiceRecording() {
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        await uploadVoiceNote(audioBlob);
+                        
+                        // Stop all tracks
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    voiceButton.classList.add('recording');
+                    voiceIcon.textContent = '⏹️';
+                    voiceText.textContent = 'Stop';
+                    recordingStartTime = Date.now();
+
+                } catch (error) {
+                    alert('Could not access microphone: ' + error.message);
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                voiceButton.classList.remove('recording');
+                voiceIcon.textContent = '🎤';
+                voiceText.textContent = 'Voice';
+            }
+        }
+
+        async function uploadVoiceNote(audioBlob) {
+            const formData = new FormData();
+            formData.append('voice', audioBlob, 'voice-note.webm');
+
+            try {
+                const response = await fetch('/upload-voice/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // Send voice message through WebSocket
+                    chatSocket.send(JSON.stringify({
+                        'type': 'voice',
+                        'voice_url': data.voice_url,
+                        'username': username
+                    }));
+                }
+            } catch (error) {
+                console.error('Error uploading voice note:', error);
+                alert('Failed to send voice note');
+            }
+        }
+
         sendButton.onclick = sendMessage;
+        voiceButton.onclick = toggleVoiceRecording;
 
         messageInput.onkeypress = function(e) {
             if (e.key === 'Enter') {

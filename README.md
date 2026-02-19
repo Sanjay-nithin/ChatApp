@@ -5,9 +5,10 @@ A simple real-time chat application built with Django and WebSockets for two peo
 ## Features
 
 - Real-time messaging using WebSockets (Django Channels)
+- **Voice Notes**: Record and send voice messages
 - Simple login system (no password required)
-- Message history
-- Clean and modern UI
+- Message history with text and voice notes
+- Clean and modern UI with recording animation
 - Docker support for easy deployment
 
 ## Local Development
@@ -66,7 +67,11 @@ docker run -p 8000:8000 chatapp
 
 1. Open the app in your browser
 2. Enter your name to join the chat
-3. Start chatting with the other person!
+3. Type and send text messages, or click the 🎤 Voice button to record voice notes
+4. Click the Voice button again to stop recording and send
+5. Voice notes appear with a playback control
+
+**Note**: Allow microphone access when prompted to use voice notes.
 
 ## Technologies Used
 

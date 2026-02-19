@@ -30,8 +30,12 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 # CSRF Settings
 CSRF_TRUSTED_ORIGINS = [
+    "https://39d6-2a09-bac5-3fd9-eaa-00-176-78.ngrok-free.app",
     'https://chatapp-h5oc.onrender.com',
     'https://*.onrender.com',
+    'https://*.ngrok-free.app',
+    'https://*.ngrok.io',
+    'https://*.ngrok.app',
 ]
 
 
@@ -140,6 +144,10 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Whitenoise for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files (User uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
